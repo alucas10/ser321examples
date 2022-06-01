@@ -304,6 +304,42 @@ class WebServer {
           // TODO: Include error handling here with a correct error code and
           // a response that makes sense
 
+        } else if (request.contains("char?")) {
+          // This multiplies two numbers, there is NO error handling, so when
+          // wrong data is given this just crashes
+          try {
+            Map<String, String> query_pairs = new LinkedHashMap<String, String>();
+            // extract path parameters
+            query_pairs = splitQuery(request.replace("char?", ""));
+            if (query_pairs.containsKey("ch")) {
+              // extract required fields from parameters
+              char ch = query_pairs.get("ch").charAt(0);
+
+              // do math
+              int charVal = ch - '0';
+
+              // Generate response
+              builder.append("HTTP/1.1 200 OK\n");
+              builder.append("Content-Type: text/html; charset=utf-8\n");
+              builder.append("\n");
+              builder.append("Character value: " + charVal);
+            } else {
+              builder.append("HTTP/1.1 400 Bad Request\n");
+              builder.append("Content-Type: text/html; charset=utf-8\n");
+              builder.append("\n");
+              builder.append("ch parameter not provided correctly");
+            }
+          }
+          catch (Exception exc){
+            builder.append("HTTP/1.1 400 Bad Request\n");
+            builder.append("Content-Type: text/html; charset=utf-8\n");
+            builder.append("\n");
+            builder.append("Invalid request");
+          }
+
+          // TODO: Include error handling here with a correct error code and
+          // a response that makes sense
+
         } else if (request.contains("github?")) {
           // pulls the query from the request and runs it with GitHub's REST API
           // check out https://docs.github.com/rest/reference/
