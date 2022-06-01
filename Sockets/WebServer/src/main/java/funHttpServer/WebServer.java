@@ -25,6 +25,10 @@ import java.util.Random;
 import java.util.Map;
 import java.util.LinkedHashMap;
 import java.nio.charset.Charset;
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
 
 class WebServer {
   public static void main(String args[]) {
@@ -213,15 +217,88 @@ class WebServer {
               builder.append("Content-Type: text/html; charset=utf-8\n");
               builder.append("\n");
               builder.append("Result is: " + result);
+            } else {
+              builder.append("HTTP/1.1 400 Bad Request\n");
+              builder.append("Content-Type: text/html; charset=utf-8\n");
+              builder.append("\n");
+              builder.append("Two values required");
             }
           }
           catch (Exception exc){
+            builder.append("HTTP/1.1 400 Bad Request\n");
+            builder.append("Content-Type: text/html; charset=utf-8\n");
+            builder.append("\n");
+            builder.append("Invalid request");
+          }
+
+          // TODO: Include error handling here with a correct error code and
+          // a response that makes sense
+
+        } else if (request.contains("comb?")) {
+          // This multiplies two numbers, there is NO error handling, so when
+          // wrong data is given this just crashes
+          try {
+            Map<String, String> query_pairs = new LinkedHashMap<String, String>();
+            // extract path parameters
+            query_pairs = splitQuery(request.replace("comb?", ""));
+            if (query_pairs.containsKey("n") && query_pairs.containsKey("k")) {
+              // extract required fields from parameters
+              Integer n = Integer.parseInt(query_pairs.get("n"));
+              Integer k = Integer.parseInt(query_pairs.get("k"));
+
+              if (n > 13) {
+                builder.append("HTTP/1.1 400 Bad Request\n");
+                builder.append("Content-Type: text/html; charset=utf-8\n");
+                builder.append("\n");
+                builder.append("n cannot be greater than 13");
+                return builder.toString().getBytes();
+              } else if (k > n) {
+                builder.append("HTTP/1.1 400 Bad Request\n");
+                builder.append("Content-Type: text/html; charset=utf-8\n");
+                builder.append("\n");
+                builder.append("k cannot be greater than n");
+                return builder.toString().getBytes();
+              } else if (k < 1 || n < 1) {
+                builder.append("HTTP/1.1 400 Bad Request\n");
+                builder.append("Content-Type: text/html; charset=utf-8\n");
+                builder.append("\n");
+                builder.append("n and k must be greater than 0");
+                return builder.toString().getBytes();
+              }
+
+              // do math
+              int numer = 1;
+              int denom = 1;
+
+              for (int i = n; i > n - k; i--) {
+                numer *= i;
+              }
+
+              for (int i = 1; i <= k; i++) {
+                denom *= i;
+              }
+
+              int result = numer / denom;
+
+              // Generate response
+              builder.append("HTTP/1.1 200 OK\n");
+              builder.append("Content-Type: text/html; charset=utf-8\n");
+              builder.append("\n");
+              builder.append("Number of combinations: " + result);
+            } else {
+              builder.append("HTTP/1.1 400 Bad Request\n");
+              builder.append("Content-Type: text/html; charset=utf-8\n");
+              builder.append("\n");
+              builder.append("n and k values required");
+            }
+          }
+          catch (Exception exc){
+            System.out.print(exc);
 
             builder.append("HTTP/1.1 400 Bad Request\n");
             builder.append("Content-Type: text/html; charset=utf-8\n");
             builder.append("\n");
-            builder.append("Invalid parameters");
-
+            builder.append("Invalid request");
           }
 
           // TODO: Include error handling here with a correct error code and
@@ -235,16 +312,63 @@ class WebServer {
           //     then drill down to what you care about
           // "Owner's repo is named RepoName. Example: find RepoName's contributors" translates to
           //     "/repos/OWNERNAME/REPONAME/contributors"
-
           Map<String, String> query_pairs = new LinkedHashMap<String, String>();
-          query_pairs = splitQuery(request.replace("github?", ""));
+
+          try {
+            query_pairs = splitQuery(request.replace("github?", ""));
+          }
+          catch (Exception exc) {
+            builder.append("HTTP/1.1 400 Bad Request\n");
+            builder.append("Content-Type: text/html; charset=utf-8\n");
+            builder.append("\n");
+            builder.append("Invalid request");
+            return builder.toString().getBytes();
+          }
+
           String json = fetchURL("https://api.github.com/" + query_pairs.get("query"));
-          System.out.println(json);
+          JSONParser parser = new JSONParser();
+          Object obj = null;
+
+          try {
+            obj = parser.parse(json);
+          }
+          catch (Exception exc) {
+            builder.append("HTTP/1.1 400 Bad Request\n");
+            builder.append("Content-Type: text/html; charset=utf-8\n");
+            builder.append("\n");
+            builder.append("Malformed JSON");
+            return builder.toString().getBytes();
+          }
+
+          JSONArray jsonArr = (JSONArray) obj;
+          int arrSize = 0;
+
+          try {
+            arrSize = jsonArr.size();
+          }
+          catch (Exception exc) {
+            builder.append("HTTP/1.1 400 Bad Request\n");
+            builder.append("Content-Type: text/html; charset=utf-8\n");
+            builder.append("\n");
+            builder.append("Invalid request");
+            return builder.toString().getBytes();
+          }
+
+          String repos = "";
+          for (int i = 0; i < arrSize; i++) {
+            JSONObject repo = (JSONObject)jsonArr.get(i);
+
+            repos = repos + i + ":<br>";
+            repos = repos + (String)repo.get("full_name") + "<br>";
+            repos = repos + "id: " + repo.get("id") + "<br>";
+            JSONObject owner = (JSONObject)repo.get("owner");
+            repos = repos + "owner: " + (String)owner.get("login") + "<br><br>";
+          }
 
           builder.append("HTTP/1.1 200 OK\n");
           builder.append("Content-Type: text/html; charset=utf-8\n");
           builder.append("\n");
-          builder.append("Check the todos mentioned in the Java source file");
+          builder.append(repos);
           // TODO: Parse the JSON returned by your fetch and create an appropriate
           // response based on what the assignment document asks for
 
